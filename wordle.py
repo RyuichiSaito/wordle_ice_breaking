@@ -37,8 +37,8 @@ class WordleData:
         self.df_five['word'] = self.df_five['word'].str.upper()  # lowercase all words and get unique words
 
     def choice_word(self):
-        idx = random.randint(0, self.df_five_unique.shape[0] - 1)
-        answord = self.df_five_unique.iloc[idx, 0]
+        idx = random.randint(0, self.df_five.shape[0] - 1)
+        answord = self.df_five.iloc[idx, 0]
         print("The anser word is: ", answord)
         return answord
 
@@ -243,7 +243,8 @@ def main():
     pg = PlayData(file_name)
     pg.read_data_nltk()
     pg.df_sep()
-    pg.solver()
+    pg.game()
+    #pg.solver()
 
 if __name__ == '__main__':
     main()
