@@ -71,4 +71,4 @@ for word in df_five['word']:
 entropy_all = sorted(entropy_all, reverse=True)
 entropy_all
 
-# best word is "TARES" (entropy = 6.347), "CARES" (entropy = 6.341)
+# best word is "TARES" (entropy = 6.347), next is "CARES" (entropy = 6.341)
