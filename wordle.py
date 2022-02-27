@@ -1,6 +1,9 @@
 import pandas as pd
+import numpy as np
 import warnings
 import random
+
+from collections import Counter
 
 
 # ignore warnings
@@ -32,7 +35,7 @@ class WordleData:
         Reads words from the file and creates wordle format dataframe.
         """
         self.df_five_unique = pd.read_table("wordle_dict.txt", sep='\t', header=None, names=['word'])
-        self.df_five = pd.read_table("wordle_dict_all.txt", sep='\t', header=None, names=['word'])
+        self.df_five = pd.read_table("wordle_dict_all_2.txt", sep='\t', header=None, names=['word'])
         self.df_five_unique['word'] = self.df_five_unique['word'].str.upper()  # lowercase all words and get unique words
         self.df_five['word'] = self.df_five['word'].str.upper()  # lowercase all words and get unique words
 
@@ -58,10 +61,12 @@ class WordleData:
         self.df_five_sep['word_3'] = self.df_five_sep['word'].str[2]
         self.df_five_sep['word_4'] = self.df_five_sep['word'].str[3]
         self.df_five_sep['word_5'] = self.df_five_sep['word'].str[4]
+        self.df_five_sep_delnot = self.df_five_sep.copy()
         # print(self.df_five_sep.head)
 
     def print_five_sep(self):
         print(self.df_five_sep)
+        self.calc_entropy_all()
 
     def del_include(self):
         """
@@ -80,6 +85,8 @@ class WordleData:
             w = self.usr_notindcluded.pop()
             self.df_five_sep = self.df_five_sep.query('word_1 != @w and word_2 != @w and word_3 != @w and word_4 != @w and word_5 != @w')
             self.df_five_sep = self.df_five_sep.reset_index(drop=True)
+            self.df_five_sep_delnot = self.df_five_sep_delnot.query('word_1 != @w and word_2 != @w and word_3 != @w and word_4 != @w and word_5 != @w')
+            self.df_five_sep_delnot = self.df_five_sep_delnot.reset_index(drop=True)
 
     def del_decision(self):
         """
@@ -100,13 +107,56 @@ class WordleData:
                 w = self.usr_notdecision[i].pop()
                 self.df_five_sep = self.df_five_sep[self.df_five_sep['word_' + str(i + 1)] != w]
                 self.df_five_sep = self.df_five_sep.reset_index(drop=True)
+                self.df_five_sep_delnot = self.df_five_sep_delnot[self.df_five_sep_delnot['word_' + str(i + 1)] != w]
+                self.df_five_sep_delnot = self.df_five_sep_delnot.reset_index(drop=True)
+
+    # スコアの計算
+    def calc_score_easy(self, answord, predword):
+        score = []
+        for str_ans, str_pred in zip(answord, predword):
+            if str_ans == str_pred:
+                score.append(2)
+            elif str_pred in answord:
+                score.append(1)
+            else:
+                score.append(0)
+        return score
+
+    # ある入力単語が与えられたとき，スコアを全単語で計算
+    def calc_all_score(self, word_input):
+        scores = []
+        for word in self.df_five_sep['word']:
+            score = self.calc_score_easy(word_input, word)
+            scores.append(tuple(score))
+        return scores
+
+    # エントロピーの計算
+    def calc_entropy(self, word_input):
+        scores = self.calc_all_score(word_input)
+        entropy = 0
+        for num in Counter(scores).values():
+            entropy += -num / len(scores) * np.log2(num / len(scores))
+        return entropy
+
+    def calc_entropy_all(self):
+        # 全単語のエントロピーを計算 (存在しない単語のみ省いたリストで計算)
+        entropy_all = []
+        for word in self.df_five_sep_delnot['word']:
+            entropy_all.append((self.calc_entropy(word), word))
+
+        entropy_all = sorted(entropy_all, reverse=True)
+        print(entropy_all[0:10])
 
 
 class PlayData(WordleData):
-    def __init__(self, filename):
+    """
+    game class
+    """
+    def __init__(self, filename, gameiter = 5):
         super().__init__(filename)
         self.ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         self.answord = None
+        self.gameiter = gameiter
         self.usr_decision = ['' for _ in range(5)]
         self.usr_notdecision = [set() for _ in range(5)]
         self.usr_included = set()
@@ -154,11 +204,11 @@ class PlayData(WordleData):
         """
         Prints the state of the game.
         """
-        print("Your score: ", self.score)
-        print("Your decision: ", self.usr_decision)
-        print("Your not-decision: ", self.usr_notdecision)
-        print("Your included: ", self.usr_included)
-        print("Your not-included: ", self.usr_notindcluded)
+        #print("Your score: ", self.score)
+        #print("Your decision: ", self.usr_decision)
+        #print("Your not-decision: ", self.usr_notdecision)
+        #print("Your included: ", self.usr_included)
+        #print("Your not-included: ", self.usr_notindcluded)
      
         self.cut_df()
 
@@ -203,7 +253,7 @@ class PlayData(WordleData):
         """
         self.answord = self.choice_word()
         self.reset_alpha_list()
-        for i in range(5):
+        for i in range(self.gameiter):
             usr_ans = self.get_input()
             usr_ans = usr_ans.upper()
             if usr_ans == self.answord:
@@ -219,7 +269,7 @@ class PlayData(WordleData):
         Solver function.
         """
         self.reset_alpha_list()
-        for i in range(5):
+        for i in range(self.gameiter):
             usr_ans = self.get_input()
             score = self.get_input_wordle()
             # calc
@@ -238,13 +288,15 @@ class PlayData(WordleData):
                     self.usr_notindcluded.add(str_usr)
             self.print_state()
 
+
 def main():
     file_name = 'ejdic-hand-txt/ejdict-hand-utf8.txt'
-    pg = PlayData(file_name)
+    pg = PlayData(file_name, gameiter=10)
     pg.read_data_nltk()
     pg.df_sep()
-    pg.game()
-    #pg.solver()
+    #pg.game()
+    pg.solver()
+
 
 if __name__ == '__main__':
     main()
